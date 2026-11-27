@@ -3,7 +3,14 @@ from rooms import generate_room_id
 from rooms import rooms
 from fastapi import WebSocket, WebSocketDisconnect
 app=FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5500"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 @app.get("/")
 async def root():
     return {"message":"Hello World!" }
@@ -34,7 +41,10 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
             try:
                 while True:
                     data = await websocket.receive_text()
-                    await websocket.send_text(f"Server received: {data}")
+                    for connection in rooms[room_id]:
+                        if connection is websocket:
+                            continue
+                        await connection.send_text(data)
 
             except WebSocketDisconnect:
                 print("Client disconnected")
@@ -59,3 +69,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
             code=1008,
             reason="Room does not exist"
         )
+
+@app.get("/api/rooms/{room_id}")
+async def check_room(room_id: str):
+    return {"exists": room_id in rooms}
